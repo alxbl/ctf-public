@@ -1,0 +1,15 @@
+[containers]
+
+ctn-abeaulieu-avatarsvc-1  ansible_host=ctn-abeaulieu-avatarsvc-1
+ctn-abeaulieu-avatarsvc-2  ansible_host=ctn-abeaulieu-avatarsvc-2
+
+[all:vars]
+webportal_root=/app/webportal/
+backupsvc_root=/app/backupsvc/
+avatarsvc_root=/app/avatarsvc/
+
+ansible_connection=lxd
+ansible_user=root
+ansible_lxd_remote=local
+#ansible_lxd_project=default
+ansible_python_interpreter=/usr/bin/python3

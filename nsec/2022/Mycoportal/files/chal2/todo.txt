@@ -1,0 +1,5 @@
+- [X] Deploy backup service on critical architecture
+- [X] Configure sensitive files
+- [ ] Ask Yuri to investigate backup service crash... it's filling up the disk.
+- [ ] Automate backup uploads to offsite mainframe
+- [ ] Submit FLAG-97a71bed64c993327d11eb7c52ccc323cb2487cf

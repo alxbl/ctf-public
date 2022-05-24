@@ -1,0 +1,142 @@
+---
+- name: "Install systemd-coredump"
+  block:
+    - apt:
+        name: systemd-coredump
+        state: present
+    - lineinfile:
+        path: '/etc/default/grub'
+        regexp: '^GRUB_CMDLINE_LINUX='
+        line: 'GRUB_CMDLINE_LINUX=coredump_filter=0x3f'
+    - shell: update-grub
+
+- name: "Install nginx"
+  block:
+    - apt:
+        name: nginx
+        state: present
+    - copy:
+        src: '{{ playbook_dir }}/../files/nginx.conf'
+        dest: /etc/nginx/sites-enabled/default
+        mode: '0644'
+        owner: root
+        group: root
+
+    - service:
+        name: nginx
+        enabled: true
+        state: restarted
+
+# CHALLENGE 1: WEB PORTAL SERIALIZATION RCE
+- name: "Challenge 1: Web Portal"
+  block:
+  - name: "Create webportal directory"
+    file:
+      path: '{{ webportal_root }}'
+      owner: www-data
+      group: www-data
+      mode: '0755'
+      state: directory
+
+  - name: "Deploy webportal"
+    copy:
+      src: '{{ playbook_dir }}/../src/Mycoverse.Web/bin/Release/net6.0/publish/'
+      dest: '{{ webportal_root }}'
+      mode: '0644'
+      owner: www-data
+      group: www-data
+
+  - name: 'Mark server executable'
+    file:
+      path: '{{ webportal_root }}/Mycoverse.Web'
+      mode: '0755'
+
+  - name: "Deploy flag 1"
+    copy:
+      src: '{{ playbook_dir }}/../files/chal1/flag.txt'
+      dest: '{{ webportal_root }}'
+      mode: '0644'
+      owner: www-data
+      group: www-data
+
+### CHALLENGE 2: BACKUP SERVICE
+- name: "Challenge 2: Backup Service"
+  block:
+  - name: "Create backup directory"
+    file:
+      path: '{{ backupsvc_root }}'
+      owner: backup
+      group: backup
+      mode: '0755'
+      state: directory
+
+  - name: "Deploy backup service"
+    copy:
+      src: '{{ playbook_dir }}/../src/Mycoverse.Services.Backup/bin/Release/net6.0/publish/'
+      dest: '{{ backupsvc_root }}'
+      mode: '0644'
+      owner: root
+      group: root
+
+  - name: "Mark backup service executable"
+    file:
+      path: '{{ backupsvc_root }}/Mycoverse.Services.Backup'
+      mode: '0755'
+
+  - name: "Setup filesystem"
+    block:
+    - name: "Create config directory"
+      file:
+        path: '/etc/backup'
+        owner: root
+        group: root
+        mode: 0755
+        state: directory
+    - name: "Copy config files"
+      copy:
+        src: '{{ playbook_dir }}/../files/chal2/cfg/'
+        dest: '/etc/backup/'
+        owner: backup
+        group: backup
+        mode: 0600
+    - name: "Copy hint file"
+      copy:
+        src: '{{ playbook_dir }}/../files/chal2/todo.txt'
+        dest: '/app/backupsvc'
+        owner: root
+        group: root
+        mode: 0644
+  - name: "Setup cron job to cleanup old coredumps"
+    cron:
+      name: "cleanup stale coredumps"
+      job: "find /var/lib/systemd/coredump/*.lz4 -mmin +30 -exec rm {} +"
+      minute: "*/5"
+  - name: "Setup cron job to cleanup backups"
+    cron:
+      name: "cleanup old backups"
+      job: "find /var/backups/* -mmin +60 -exec rm {} +"
+      minute: "*/5"    
+# Setup services
+- name: "Install services"
+  template:
+    src: '{{ playbook_dir }}/../files/templates/service.j2'
+    dest: '/usr/lib/systemd/system/{{ svc.name }}.service'
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+    - { name: 'webportal', user: 'www-data', path: '{{ webportal_root }}/Mycoverse.Web', cwd: '{{ webportal_root }}' }
+    - { name: 'backupsvc', user: 'root', path: '{{ backupsvc_root }}/Mycoverse.Services.Backup', cwd: '{{ backupsvc_root }}' }
+  loop_control:
+    loop_var: svc
+
+- name: "Enable services"
+  service: 
+    name: '{{ service_name }}'
+    state: restarted
+    enabled: true
+  with_items:
+    - webportal
+    - backupsvc
+  loop_control:
+    loop_var: service_name

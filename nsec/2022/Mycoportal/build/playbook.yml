@@ -1,0 +1,76 @@
+# First, locally build everything
+- name: Build challenge sources
+  hosts: localhost
+  tasks:
+  - local_action: shell
+    args:
+      cmd: bash build.sh
+
+  # Remove debug symbols from build artifacts.
+  - local_action: shell
+    args:
+      cmd: 'find {{ playbook_dir }}/../src -name "*.pdb" -exec rm {} + ;'
+
+- name: Install dotnet runtime
+  # https://docs.microsoft.com/en-us/dotnet/core/install/linux-ubuntu#2004-
+  hosts: all
+  environment:
+    # This is apparently needed for APT to be happy going through the nsec proxy for packages.microsoft.com /shrug.
+    APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE: DontWarn
+  tasks:
+  - name: Retrieve Microsoft signing keys
+    get_url: 
+      url: https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+      dest: /msft-keys.deb
+
+  - name: Enroll Microsoft signing keys
+    shell: dpkg -i /msft-keys.deb && touch /.msft_key_added
+    args:
+      creates: /.msft_key_added
+
+  - name: Install HTTPS transport
+    apt:
+      name: apt-transport-https
+      state: present
+      update_cache: true
+
+  - name: Install ASP.NET Core 6.0 runtime
+    apt:
+      name: aspnetcore-runtime-6.0
+      state: present
+
+  - name: Install netcat
+    apt:
+      name: netcat
+      state: present
+
+- name: Setup containers
+  hosts: all
+  tasks:
+    - name: "Create application directory"
+      file:
+        path: /app
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    - name: "Disable bash_history for root"
+      file:
+        dest: "/root/.bash_history"
+        src: /dev/null
+        state: link
+        force: yes
+    - name: "Disable bash_history for ubuntu"
+      file:
+        dest: "/home/ubuntu/.bash_history"
+        src: /dev/null
+        state: link
+        force: yes
+        
+    - name: Containers
+      include_tasks: '{{ item }}'
+      with_first_found:
+        - files:
+          - '{{ playbook_dir }}/containers/{{ inventory_hostname }}.yml'
+          skip: true

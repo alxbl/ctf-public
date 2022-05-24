@@ -1,0 +1,57 @@
+---
+- name: "Create avatarsvc directory"
+  file:
+    path: '{{ avatarsvc_root }}'
+    owner: www-data
+    group: www-data
+    mode: '0755'
+    state: directory
+
+- name: "Deploy avatar service"
+  copy:
+    src: '{{ playbook_dir }}/../src/Mycoverse.Services.Avatar/bin/Release/net6.0/publish/'
+    dest: '{{ avatarsvc_root }}'
+    mode: '0644'
+    owner: www-data
+    group: www-data
+
+- name: 'Mark server executable'
+  file:
+    path: '{{ avatarsvc_root }}/Mycoverse.Services.Avatar'
+    mode: '0755'
+
+# Setup services
+- name: "Install services"
+  template:
+    src: '{{ playbook_dir }}/../files/templates/service.j2'
+    dest: '/usr/lib/systemd/system/{{ svc.name }}.service'
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+    - { name: 'avatarsvc', user: 'www-data', path: '{{ avatarsvc_root }}/Mycoverse.Services.Avatar', cwd: '{{ avatarsvc_root }}' }
+  loop_control:
+    loop_var: svc
+
+- name: "Enable services"
+  service: 
+    name: '{{ item }}'
+    state: restarted
+    enabled: true
+  with_items:
+    - avatarsvc
+
+- name: "Deploy database"
+  copy:
+    src: '{{ playbook_dir }}/../files/chal3/db.sqlite'
+    dest: '/app/db.sqlite'
+    mode: '0600'
+    owner: www-data
+    group: www-data
+- name: "Deploy flag 4"
+  copy:
+    src: '{{ playbook_dir }}/../files/chal4/flag.txt'
+    dest: '{{ avatarsvc_root }}/flag.txt'
+    mode: '0600'
+    owner: www-data
+    group: www-data

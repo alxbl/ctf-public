@@ -1,0 +1,17 @@
+[Unit]
+Description={{ svc.path }}
+After=network.target
+
+[Service]
+Type=simple
+User={{ svc.user }}
+Group={{ svc.user }}
+WorkingDirectory={{ svc.cwd }}
+ExecStart={{ svc.path }}
+Restart=on-failure
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+[Install]
+WantedBy=multi-user.target

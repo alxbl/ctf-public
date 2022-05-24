@@ -1,0 +1,7 @@
+.dotnet/
+.local/
+.nuget/
+.templateengine/
+**/bin
+**/obj
+.bash_history
